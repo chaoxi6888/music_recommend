@@ -3,6 +3,49 @@
 #include <string.h>
 #include <mysql/mysql.h> // MySQL C API头文件
 
+// 用户注册功能
+void user_sign(MYSQL *conn, char *n, char *pwd, char *ph, char *em)
+{
+    // 关闭自动提交，开启事务
+    mysql_autocommit(conn, 0);
+
+    char query[256];
+    snprintf(query, sizeof(query),
+             "insert into user(`username`,`password`,`mobile`,`email`) "
+             "value('%s','%s','%s','%s')",
+             n, pwd, ph, em);
+
+    if (mysql_query(conn, query))
+    {
+        fprintf(stderr, "用户创建失败:%s\n", mysql_error(conn));
+        mysql_rollback(conn);      // 回滚事务
+        mysql_autocommit(conn, 1); // 恢复自动提交
+        return;
+    }
+
+    // 获取新用户的id
+    int newuser_id = mysql_insert_id(conn);
+
+    char friends_query[256];
+    snprintf(friends_query, sizeof(friends_query),
+             "insert into friends(`user_id`,`follower_count`,`following_count`,`blocked_count`) "
+             "values(%d, 0, 0, 0)",
+             newuser_id);
+
+    if (mysql_query(conn, friends_query))
+    {
+        fprintf(stderr, "新用户friends关系插入失败:%s\n", mysql_error(conn));
+        mysql_rollback(conn);      // 回滚事务
+        mysql_autocommit(conn, 1); // 恢复自动提交
+        return;
+    }
+
+    // 提交事务
+    mysql_commit(conn);
+    mysql_autocommit(conn, 1); // 恢复自动提交
+    printf("用户创建成功,且成功插入friends表\n");
+}
+
 // 查询user表中所有用户信息并打印
 void query_all_users(MYSQL *conn)
 {
@@ -199,9 +242,10 @@ int main()
     // 连接成功提示
     printf("连接数据库成功\n");
 
+    // user_sign(conn, "liujeilun", "chaoqiqwq", "17899992341", "2403247788@qq.com");
     // query_all_users(conn);
     // query_top3_music(conn);
-    recommend_by_user_and_music(conn, 3, 5);
+    // recommend_by_user_and_music(conn, 3, 5);
 
     // 结束程序前关闭数据库连接，释放资源
     mysql_close(conn);
