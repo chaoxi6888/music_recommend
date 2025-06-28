@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <mysql/mysql.h> // MySQL C API头文件
 
 // 查询user表中所有用户信息并打印
@@ -8,10 +9,10 @@ void query_all_users(MYSQL *conn)
     // 定义SQL查询语句，查询user表的主要字段
     const char *query = "SELECT `user_id`,`username`,`password`,`mobile`,`email` FROM user";
     // 执行SQL查询
-    if (mysql_query(conn, query))
+    if (mysql_query(conn, query)) // 返回值为0成功
     {
         // 查询失败时输出错误信息
-        fprintf(stderr, "查询失败: %s\n", mysql_error(conn));
+        fprintf(stderr, "查询用户失败: %s\n", mysql_error(conn));
         return;
     }
 
@@ -20,7 +21,7 @@ void query_all_users(MYSQL *conn)
     if (result == NULL)
     {
         // 获取结果集失败时输出错误信息
-        fprintf(stderr, "获取结果集失败: %s\n", mysql_error(conn));
+        fprintf(stderr, "获取用户结果集失败: %s\n", mysql_error(conn));
         return;
     }
 
@@ -44,6 +45,124 @@ void query_all_users(MYSQL *conn)
 
     // 释放结果集资源
     mysql_free_result(result);
+}
+
+// 查询top3音乐
+void query_top3_music(MYSQL *conn)
+{
+    // 定义语句
+    const char *query =
+        "SELECT music_name, COUNT(*) as play_count "
+        "FROM user_music_history "
+        "WHERE is_finished = 1 "
+        "GROUP BY music_name "
+        "ORDER BY play_count DESC "
+        "LIMIT 3";
+    // 执行SQL查询
+    if (mysql_query(conn, query))
+    {
+        fprintf(stderr, "查询top3失败:%s\n", mysql_error(conn));
+        return;
+    }
+
+    MYSQL_RES *result = mysql_store_result(conn);
+    if (result == NULL)
+    {
+        fprintf(stderr, "查询top3结果集失败%s\n", mysql_error(conn));
+        return;
+    }
+
+    printf("排行前三的歌曲为:\n");
+
+    MYSQL_ROW row;
+    int i = 0;
+    while (row = mysql_fetch_row(result))
+    {
+        printf("NO%d:%-20s\n", i + 1, row[0] ? row[0] : "NULL");
+        i++;
+    }
+
+    mysql_free_result(result);
+}
+
+// 根据用户听过的某首歌的类型，推荐同类型最热门的两首歌曲
+void recommend_by_user_and_music(MYSQL *conn, int user_id, int music_id)
+{
+    char music_type[64] = {0}; // 用于存储指定歌曲的类型
+
+    // 1. 查询该歌曲的类型
+    char query_type[256];
+    snprintf(query_type, sizeof(query_type),
+             "SELECT music_type FROM music WHERE music_id = %d", music_id);
+
+    // 执行查询，获取music_id对应的歌曲类型
+    if (mysql_query(conn, query_type))
+    {
+        fprintf(stderr, "查询歌曲类型失败: %s\n", mysql_error(conn));
+        return;
+    }
+
+    // 获取查询结果集
+    MYSQL_RES *type_result = mysql_store_result(conn);
+    if (type_result == NULL)
+    {
+        fprintf(stderr, "获取歌曲类型结果集失败: %s\n", mysql_error(conn));
+        return;
+    }
+
+    // 取出查询到的类型
+    MYSQL_ROW type_row = mysql_fetch_row(type_result);
+    if (type_row && type_row[0])
+    {
+        // 将类型字符串拷贝到music_type变量
+        strncpy(music_type, type_row[0], sizeof(music_type) - 1);
+    }
+    else
+    {
+        // 没查到类型，无法推荐
+        printf("未找到该歌曲类型，无法推荐。\n");
+        mysql_free_result(type_result);
+        return;
+    }
+    mysql_free_result(type_result); // 释放类型查询结果集
+
+    // 2. 推荐同类型最热门的两首歌曲（不包含当前music_id）
+    char query_recommend[512];
+    snprintf(query_recommend, sizeof(query_recommend),
+             "SELECT b.music_name, COUNT(*) as play_count "
+             "FROM user_music_history a "
+             "LEFT JOIN music b ON a.music_id = b.music_id "
+             "WHERE a.is_finished = 1 AND b.music_type = '%s' AND b.music_id != %d "
+             "GROUP BY b.music_name "
+             "ORDER BY play_count DESC "
+             "LIMIT 2",
+             music_type, music_id);
+
+    // 执行推荐查询
+    if (mysql_query(conn, query_recommend))
+    {
+        fprintf(stderr, "推荐歌曲查询失败: %s\n", mysql_error(conn));
+        return;
+    }
+
+    // 获取推荐结果集
+    MYSQL_RES *rec_result = mysql_store_result(conn);
+    if (rec_result == NULL)
+    {
+        fprintf(stderr, "获取推荐结果集失败: %s\n", mysql_error(conn));
+        return;
+    }
+
+    // 打印推荐结果
+    printf("为用户%d推荐类型(%s)最热门的两首歌曲:\n", user_id, music_type);
+    MYSQL_ROW row;
+    while (row = mysql_fetch_row(rec_result))
+    {
+        // 输出歌曲名（row[0]），若为空则输出"NULL"
+        printf("%-20s\n", row[0] ? row[0] : "NULL");
+    }
+
+    mysql_free_result(rec_result); // 释放推荐结果集
 }
 
 int main()
@@ -80,7 +199,9 @@ int main()
     // 连接成功提示
     printf("连接数据库成功\n");
 
-    query_all_users(conn);
+    // query_all_users(conn);
+    // query_top3_music(conn);
+    recommend_by_user_and_music(conn, 3, 5);
 
     // 结束程序前关闭数据库连接，释放资源
     mysql_close(conn);
