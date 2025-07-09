@@ -46,6 +46,131 @@ void user_sign(MYSQL *conn, char *n, char *pwd, char *ph, char *em)
     printf("用户创建成功,且成功插入friends表\n");
 }
 
+// 添加好友功能
+void friends_add(MYSQL *conn, int op_id, int oped_id, char op)
+{
+    mysql_autocommit(conn, 0);
+
+    if (!(op == 'f' || op == 'u' || op == 'b' || op == 'r'))
+    {
+        printf("操作非法,请检查操作是否为f,u,b,r\n");
+        mysql_autocommit(conn, 1);
+        return;
+    }
+
+    int update_ok = 1;
+    char query[256];
+
+    if (op == 'f') // 关注
+    {
+        // 检查是否已关注
+        snprintf(query, sizeof(query),
+                 "SELECT 1 FROM follow_relation WHERE user_id = %d AND follow_id = %d", op_id, oped_id);
+        if (mysql_query(conn, query) == 0)
+        {
+            MYSQL_RES *res = mysql_store_result(conn);
+            if (mysql_fetch_row(res))
+            {
+                printf("已关注该用户，不能重复关注！\n");
+                mysql_free_result(res);
+                mysql_rollback(conn);
+                mysql_autocommit(conn, 1);
+                return;
+            }
+            mysql_free_result(res);
+        }
+        // 插入关注关系
+        snprintf(query, sizeof(query),
+                 "INSERT INTO follow_relation(user_id, follow_id) VALUES(%d, %d)", op_id, oped_id);
+        if (mysql_query(conn, query))
+            update_ok = 0;
+    }
+    else if (op == 'u') // 取关
+    {
+        // 检查是否已关注
+        snprintf(query, sizeof(query),
+                 "SELECT 1 FROM follow_relation WHERE user_id = %d AND follow_id = %d", op_id, oped_id);
+        if (mysql_query(conn, query) == 0)
+        {
+            MYSQL_RES *res = mysql_store_result(conn);
+            if (!mysql_fetch_row(res))
+            {
+                printf("未关注该用户，无法取关！\n");
+                mysql_free_result(res);
+                mysql_rollback(conn);
+                mysql_autocommit(conn, 1);
+                return;
+            }
+            mysql_free_result(res);
+        }
+        // 删除关注关系
+        snprintf(query, sizeof(query),
+                 "DELETE FROM follow_relation WHERE user_id = %d AND follow_id = %d", op_id, oped_id);
+        if (mysql_query(conn, query))
+            update_ok = 0;
+    }
+    else if (op == 'b') // 拉黑
+    {
+        // 检查是否已拉黑
+        snprintf(query, sizeof(query),
+                 "SELECT 1 FROM block_relation WHERE user_id = %d AND block_id = %d", op_id, oped_id);
+        if (mysql_query(conn, query) == 0)
+        {
+            MYSQL_RES *res = mysql_store_result(conn);
+            if (mysql_fetch_row(res))
+            {
+                printf("已拉黑该用户，不能重复拉黑！\n");
+                mysql_free_result(res);
+                mysql_rollback(conn);
+                mysql_autocommit(conn, 1);
+                return;
+            }
+            mysql_free_result(res);
+        }
+        // 插入拉黑关系
+        snprintf(query, sizeof(query),
+                 "INSERT INTO block_relation(user_id, block_id) VALUES(%d, %d)", op_id, oped_id);
+        if (mysql_query(conn, query))
+            update_ok = 0;
+    }
+    else if (op == 'r') // 解除拉黑
+    {
+        // 检查是否已拉黑
+        snprintf(query, sizeof(query),
+                 "SELECT 1 FROM block_relation WHERE user_id = %d AND block_id = %d", op_id, oped_id);
+        if (mysql_query(conn, query) == 0)
+        {
+            MYSQL_RES *res = mysql_store_result(conn);
+            if (!mysql_fetch_row(res))
+            {
+                printf("未拉黑该用户，无法解除拉黑！\n");
+                mysql_free_result(res);
+                mysql_rollback(conn);
+                mysql_autocommit(conn, 1);
+                return;
+            }
+            mysql_free_result(res);
+        }
+        // 删除拉黑关系
+        snprintf(query, sizeof(query),
+                 "DELETE FROM block_relation WHERE user_id = %d AND block_id = %d", op_id, oped_id);
+        if (mysql_query(conn, query))
+            update_ok = 0;
+    }
+
+    if (!update_ok)
+    {
+        fprintf(stderr, "操作失败: %s\n", mysql_error(conn));
+        mysql_rollback(conn);
+        mysql_autocommit(conn, 1);
+        return;
+    }
+
+    mysql_commit(conn);
+    mysql_autocommit(conn, 1);
+    printf("好友操作成功，已记录到关系表。\n");
+}
+
 // 查询user表中所有用户信息并打印
 void query_all_users(MYSQL *conn)
 {
@@ -246,6 +371,7 @@ int main()
     // query_all_users(conn);
     // query_top3_music(conn);
     // recommend_by_user_and_music(conn, 3, 5);
+    friends_add(conn, 1, 7, 'f');
 
     // 结束程序前关闭数据库连接，释放资源
     mysql_close(conn);
