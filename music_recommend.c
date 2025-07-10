@@ -371,7 +371,7 @@ int main()
     // query_all_users(conn);
     // query_top3_music(conn);
     // recommend_by_user_and_music(conn, 3, 5);
-    friends_add(conn, 1, 7, 'f');
+    // friends_add(conn, 1, 7, 'f');
 
     // 结束程序前关闭数据库连接，释放资源
     mysql_close(conn);
