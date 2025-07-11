@@ -34,13 +34,14 @@ int main()
     // 连接成功提示
     printf("连接数据库成功\n");
 
-    // user_sign(conn, "liujeilun", "chaoqiqwq", "17899992341", "2403247788@qq.com");
+    // user_sign(conn, "chaoqqqq", "chaoqwer", "17879992341", "24037847788@qq.com");
     // query_all_users(conn);
     // add_music(conn, "摇滚", "江南style");
     // query_all_music(conn);
+    // listen_music(conn, 3, 5, 1);
     // query_top3_music(conn);
     // recommend_by_user_and_music(conn, 3, 5);
-    // friends_add(conn, 1, 7, 'f');
+    // friends_add(conn, 3, 4, 'f');
 
     // 结束程序前关闭数据库连接，释放资源
     mysql_close(conn);

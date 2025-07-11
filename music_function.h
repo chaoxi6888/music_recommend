@@ -90,7 +90,7 @@ void query_all_users(MYSQL *conn)
     mysql_free_result(result);
 }
 
-// 添加音乐功能，带事务，返回1表示成功，0表示失败
+// 添加音乐功能
 void add_music(MYSQL *conn, const char *music_type, const char *music_name)
 {
     // 开启事务
@@ -184,6 +184,31 @@ void query_top3_music(MYSQL *conn)
     }
 
     mysql_free_result(result);
+}
+
+// 用户听歌功能，记录听歌历史
+void listen_music(MYSQL *conn, int user_id, int music_id, int is_finished)
+{
+    // 开启事务
+    mysql_autocommit(conn, 0);
+
+    char query[256];
+    snprintf(query, sizeof(query),
+             "INSERT INTO user_music_history(user_id, music_id, is_finished) VALUES(%d, %d, %d)",
+             user_id, music_id, is_finished);
+
+    // 执行SQL语句
+    if (mysql_query(conn, query))
+    {
+        fprintf(stderr, "听歌记录插入失败: %s\n", mysql_error(conn));
+        mysql_rollback(conn);      // 回滚事务
+        mysql_autocommit(conn, 1); // 恢复自动提交
+    }
+
+    // 提交事务
+    mysql_commit(conn);
+    mysql_autocommit(conn, 1); // 恢复自动提交
+    printf("用户%d听歌music_id=%d记录添加成功\n", user_id, music_id);
 }
 
 // 根据用户听过的某首歌的类型，推荐同类型最热门的两首歌曲
@@ -388,5 +413,5 @@ void friends_add(MYSQL *conn, int op_id, int oped_id, char op)
 
     mysql_commit(conn);
     mysql_autocommit(conn, 1);
-    printf("好友操作成功，已记录到关系表。\n");
+    printf("%d用户操作成功，已记录到关系表。\n", op_id);
 }
