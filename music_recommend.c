@@ -36,6 +36,8 @@ int main()
 
     // user_sign(conn, "liujeilun", "chaoqiqwq", "17899992341", "2403247788@qq.com");
     // query_all_users(conn);
+    // add_music(conn, "摇滚", "江南style");
+    // query_all_music(conn);
     // query_top3_music(conn);
     // recommend_by_user_and_music(conn, 3, 5);
     // friends_add(conn, 1, 7, 'f');
